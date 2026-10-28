@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.WHInspection" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#3B82F6</item>
+        <item name="android:navigationBarColor">#0F172A</item>
+        <item name="android:statusBarColor">#1E293B</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
