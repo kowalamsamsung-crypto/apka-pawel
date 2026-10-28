@@ -3,6 +3,7 @@ package pl.ibi.whinspection;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -24,6 +25,10 @@ import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -43,8 +48,26 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
         webView = new WebView(this);
         setContentView(webView);
+
+        final int initialLeft = webView.getPaddingLeft();
+        final int initialTop = webView.getPaddingTop();
+        final int initialRight = webView.getPaddingRight();
+        final int initialBottom = webView.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
+            Insets safeInsets = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
+            view.setPadding(
+                    initialLeft + safeInsets.left,
+                    initialTop + safeInsets.top,
+                    initialRight + safeInsets.right,
+                    initialBottom + safeInsets.bottom);
+            return windowInsets;
+        });
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -165,6 +188,44 @@ public class MainActivity extends Activity {
                 }
             }).start();
         }
+
+        @JavascriptInterface
+        public void shareBase64File(String fileName, String mimeType, String base64Data) {
+            new Thread(() -> {
+                try {
+                    byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+                    shareFile(sanitizeFileName(fileName), mimeType, bytes);
+                } catch (Exception error) {
+                    showToast("Nie udało się udostępnić raportu: " + error.getMessage());
+                }
+            }).start();
+        }
+    }
+
+    private void shareFile(String fileName, String mimeType, byte[] bytes) throws IOException {
+        File shareDirectory = new File(getCacheDir(), "shared_reports");
+        if (!shareDirectory.exists() && !shareDirectory.mkdirs()) {
+            throw new IOException("Nie można przygotować raportu do udostępnienia");
+        }
+
+        File report = new File(shareDirectory, fileName);
+        try (FileOutputStream stream = new FileOutputStream(report)) {
+            stream.write(bytes);
+        }
+
+        Uri reportUri = FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                report);
+
+        Intent sendIntent = new Intent(Intent.ACTION_SEND);
+        sendIntent.setType(mimeType);
+        sendIntent.putExtra(Intent.EXTRA_STREAM, reportUri);
+        sendIntent.setClipData(ClipData.newRawUri("Raport PPTX", reportUri));
+        sendIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        runOnUiThread(() -> startActivity(
+                Intent.createChooser(sendIntent, "Udostępnij raport PPTX")));
     }
 
     private void saveToDownloads(String fileName, String mimeType, byte[] bytes) throws IOException {

@@ -9,6 +9,8 @@ Aplikacja Android opakowująca formularz inspekcji magazynowej i załadunkowej w
 - pozwala dodawać opcjonalne uszkodzenia przy załadunku,
 - pokazuje postęp kompletowania zdjęć,
 - generuje raport HTML i 3-slajdowy raport PPTX,
+- udostępnia raport PPTX przez systemowe menu Androida (np. Outlook, Teams, Dysk),
+- uwzględnia paski systemowe i obszary gestów na telefonach Samsung,
 - kompresuje zdjęcia lokalnie; nie wysyła danych na serwer.
 
 Wpisy i zdjęcia są przechowywane tylko w pamięci bieżącej sesji. Zamknięcie aplikacji lub jej ubijanie przez system usuwa niezapisane dane, dlatego raport należy wygenerować przed zakończeniem pracy.

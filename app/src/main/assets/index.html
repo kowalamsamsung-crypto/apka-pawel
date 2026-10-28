@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>W/H Inspection</title>
   <!-- Biblioteka PptxGenJS do generowania plików PowerPoint (.pptx) -->
   <script src="pptxgen.bundle.js"></script>
@@ -32,7 +32,7 @@
     body {
       background-color: var(--bg-main);
       color: var(--text-main);
-      padding-bottom: 100px;
+      padding-bottom: 170px;
     }
 
     header {
@@ -258,6 +258,7 @@
     .btn-warning { background-color: var(--warning); color: #0f172a; }
     .btn-success { background-color: var(--success); color: white; }
     .btn-pptx { background-color: var(--pptx-color); color: white; }
+    .btn-share { background-color: #2563eb; color: white; }
 
     .btn-danger-sm {
       background-color: rgba(239, 68, 68, 0.2);
@@ -389,14 +390,20 @@
       background-color: var(--bg-card);
       border-top: 1px solid var(--border);
       padding: 10px 12px;
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
-      justify-content: center;
       z-index: 40;
     }
 
     .bottom-bar .btn {
-      max-width: 370px;
+      min-width: 0;
+      padding: 11px 8px;
+      font-size: 0.82rem;
+    }
+
+    .bottom-bar .btn-html {
+      grid-column: 1 / -1;
     }
   </style>
 </head>
@@ -637,7 +644,10 @@
     <button class="btn btn-pptx" onclick="exportPPTXReport()">
       📊 Pobierz raport PPTX
     </button>
-    <button class="btn btn-success" onclick="exportHTMLReport()">
+    <button class="btn btn-share" onclick="exportPPTXReport(true)">
+      📤 Udostępnij PPTX
+    </button>
+    <button class="btn btn-success btn-html" onclick="exportHTMLReport()">
       📥 Pobierz raport HTML
     </button>
   </div>
@@ -943,7 +953,7 @@
       window.Android.saveBase64File(fileName, mimeType, bytesToBase64(bytes));
     }
 
-    async function exportPPTXReport() {
+    async function exportPPTXReport(shareReport = false) {
       if (typeof PptxGenJS === 'undefined') {
         alert('Nie udało się załadować lokalnego generatora PPTX. Uruchom aplikację ponownie.');
         return;
@@ -1239,11 +1249,12 @@
       try {
         if (window.Android && typeof window.Android.saveBase64File === 'function') {
           const base64 = await pptx.write({ outputType: 'base64' });
-          window.Android.saveBase64File(
-            fileName,
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            base64
-          );
+          const mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          if (shareReport && typeof window.Android.shareBase64File === 'function') {
+            window.Android.shareBase64File(fileName, mimeType, base64);
+          } else {
+            window.Android.saveBase64File(fileName, mimeType, base64);
+          }
         } else {
           await pptx.writeFile({ fileName });
         }
