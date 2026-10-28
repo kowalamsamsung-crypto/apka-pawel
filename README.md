@@ -11,6 +11,7 @@ Aplikacja Android opakowująca formularz inspekcji magazynowej i załadunkowej w
 - generuje raport HTML i 3-slajdowy raport PPTX,
 - udostępnia raport PPTX przez systemowe menu Androida (np. Outlook, Teams, Dysk),
 - uwzględnia paski systemowe i obszary gestów na telefonach Samsung,
+- eksport uruchomiony w zakładce Warehouse Inspection zawiera wyłącznie punkt 1, bez sekcji Loading Inspection,
 - kompresuje zdjęcia lokalnie; nie wysyła danych na serwer.
 
 Wpisy i zdjęcia są przechowywane tylko w pamięci bieżącej sesji. Zamknięcie aplikacji lub jej ubijanie przez system usuwa niezapisane dane, dlatego raport należy wygenerować przed zakończeniem pracy.

@@ -953,9 +953,99 @@
       window.Android.saveBase64File(fileName, mimeType, bytesToBase64(bytes));
     }
 
+    function isWarehouseTabActive() {
+      return document.getElementById('tab-warehouse').classList.contains('active');
+    }
+
+    async function deliverPPTX(pptx, fileName, shareReport) {
+      if (window.Android && typeof window.Android.saveBase64File === 'function') {
+        const base64 = await pptx.write({ outputType: 'base64' });
+        const mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+        if (shareReport && typeof window.Android.shareBase64File === 'function') {
+          window.Android.shareBase64File(fileName, mimeType, base64);
+        } else {
+          window.Android.saveBase64File(fileName, mimeType, base64);
+        }
+      } else {
+        await pptx.writeFile({ fileName });
+      }
+    }
+
+    async function exportWarehousePPTXReport(shareReport) {
+      const pptx = new PptxGenJS();
+      pptx.layout = 'LAYOUT_4x3';
+
+      const reportDate = new Date().toLocaleString('pl-PL');
+      const pageCount = Math.max(1, Math.ceil(warehouseDefects.length / 4));
+
+      for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+        const slide = pptx.addSlide();
+        addSlideHeaderAndFooter(
+          pptx,
+          slide,
+          'I. Warehouse Inspection',
+          `${pageIndex + 1} / ${pageCount}`
+        );
+
+        slide.addText(`Data: ${reportDate}    Liczba uszkodzeń: ${warehouseDefects.length}`, {
+          x: 0.45, y: 0.82, w: 9.0, h: 0.3,
+          fontSize: 12, color: '475569', fontFace: 'Arial'
+        });
+
+        if (warehouseDefects.length === 0) {
+          slide.addText('Brak zgłoszonych uszkodzeń magazynowych.', {
+            x: 1.0, y: 2.7, w: 8.0, h: 0.6,
+            fontSize: 20, bold: true, color: '64748B',
+            align: 'center', valign: 'middle', fontFace: 'Arial'
+          });
+          continue;
+        }
+
+        const pageDefects = warehouseDefects.slice(pageIndex * 4, (pageIndex + 1) * 4);
+        pageDefects.forEach((defect, localIndex) => {
+          const column = localIndex % 2;
+          const row = Math.floor(localIndex / 2);
+          const x = 0.45 + column * 4.75;
+          const y = 1.25 + row * 2.85;
+
+          slide.addShape(pptx.ShapeType.rect, {
+            x, y, w: 4.35, h: 2.55,
+            fill: { color: 'F8FAFC' },
+            line: { color: 'CBD5E1', width: 1 }
+          });
+
+          if (defect.photo) {
+            slide.addImage({ data: defect.photo, x: x + 0.12, y: y + 0.15, w: 1.75, h: 2.05 });
+          }
+
+          const globalIndex = pageIndex * 4 + localIndex + 1;
+          slide.addText(
+            `${globalIndex}. Pole: ${defect.zone}\nTyp: ${defect.types.join(', ')}\nGodzina: ${defect.time}\nUwagi: ${defect.notes || '-'}`,
+            {
+              x: x + 2.0, y: y + 0.18, w: 2.15, h: 2.05,
+              fontSize: 11, color: '0F172A',
+              valign: 'top', margin: 0.03, fontFace: 'Arial'
+            }
+          );
+        });
+      }
+
+      const fileName = `Warehouse_Inspection_${new Date().toISOString().slice(0, 10)}.pptx`;
+      await deliverPPTX(pptx, fileName, shareReport);
+    }
+
     async function exportPPTXReport(shareReport = false) {
       if (typeof PptxGenJS === 'undefined') {
         alert('Nie udało się załadować lokalnego generatora PPTX. Uruchom aplikację ponownie.');
+        return;
+      }
+
+      if (isWarehouseTabActive()) {
+        try {
+          await exportWarehousePPTXReport(shareReport);
+        } catch (error) {
+          alert('Nie udało się wygenerować raportu magazynowego PPTX: ' + error.message);
+        }
         return;
       }
 
@@ -1247,17 +1337,7 @@
 
       const fileName = `Loading_Inspection_${series}_${new Date().toISOString().slice(0, 10)}.pptx`;
       try {
-        if (window.Android && typeof window.Android.saveBase64File === 'function') {
-          const base64 = await pptx.write({ outputType: 'base64' });
-          const mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-          if (shareReport && typeof window.Android.shareBase64File === 'function') {
-            window.Android.shareBase64File(fileName, mimeType, base64);
-          } else {
-            window.Android.saveBase64File(fileName, mimeType, base64);
-          }
-        } else {
-          await pptx.writeFile({ fileName });
-        }
+        await deliverPPTX(pptx, fileName, shareReport);
       } catch (error) {
         alert('Nie udało się wygenerować raportu PPTX: ' + error.message);
       }
@@ -1297,6 +1377,25 @@
         </tr>
       `).join('') : `<tr><td colspan="5" style="text-align:center;">Brak zgłoszonych uszkodzeń opakowań podczas załadunku</td></tr>`;
 
+      const warehouseOnly = isWarehouseTabActive();
+      const loadingSectionHtml = warehouseOnly ? '' : `
+  <h2>2. Loading Inspection – Zdjęcia wymagane (Nr załadunku / TIR: ${truckId})</h2>
+  <div class="grid">${loadCards}</div>
+
+  <h3>2.1. Uszkodzone opakowania wykryte podczas załadunku (Opcjonalne: ${loadingDefects.length})</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Lp.</th>
+        <th>Godzina</th>
+        <th>Typ uszkodzenia</th>
+        <th>Opis / Uwagi</th>
+        <th>Zdjęcie</th>
+      </tr>
+    </thead>
+    <tbody>${loadDefectRows}</tbody>
+  </table>`;
+
       const reportHtml = `<!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -1312,7 +1411,7 @@
   </style>
 </head>
 <body>
-  <h1>📦 Raport Kontroli Opakowań i Załadunku Pralek</h1>
+  <h1>📦 ${warehouseOnly ? 'Raport Warehouse Inspection' : 'Raport Kontroli Opakowań i Załadunku Pralek'}</h1>
   <p><strong>Data wygenerowania:</strong> ${dateStr}</p>
 
   <h2>1. Warehouse Inspection (Uszkodzenia na magazynie: ${warehouseDefects.length})</h2>
@@ -1329,26 +1428,12 @@
     <tbody>${whRows}</tbody>
   </table>
 
-  <h2>2. Loading Inspection – Zdjęcia wymagane (Nr załadunku / TIR: ${truckId})</h2>
-  <div class="grid">${loadCards}</div>
-
-  <h3>2.1. Uszkodzone opakowania wykryte podczas załadunku (Opcjonalne: ${loadingDefects.length})</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Lp.</th>
-        <th>Godzina</th>
-        <th>Typ uszkodzenia</th>
-        <th>Opis / Uwagi</th>
-        <th>Zdjęcie</th>
-      </tr>
-    </thead>
-    <tbody>${loadDefectRows}</tbody>
-  </table>
+  ${loadingSectionHtml}
 </body>
 </html>`;
 
-      const fileName = `Raport_Inspekcji_WM_${new Date().toISOString().slice(0,10)}.html`;
+      const filePrefix = warehouseOnly ? 'Warehouse_Inspection' : 'Raport_Inspekcji_WM';
+      const fileName = `${filePrefix}_${new Date().toISOString().slice(0,10)}.html`;
       if (window.Android && typeof window.Android.saveBase64File === 'function') {
         saveTextReportOnAndroid(fileName, 'text/html; charset=utf-8', reportHtml);
       } else {
